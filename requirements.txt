@@ -12,3 +12,5 @@ hvplot==0.11.1
 geoviews==1.5.0
 cartopy==0.24.0
 earthaccess==0.11.0
+folium==0.19.4  
+mapclassify==2.8.1
