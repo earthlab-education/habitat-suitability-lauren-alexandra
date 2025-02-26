@@ -1,11 +1,14 @@
-python==3.13.2
+python==3.11.11
 pandas==2.2.3
 numpy==2.0.2
 geopandas==1.0.1
 rioxarray==0.17.0
 xarray==2024.9.0
+pyarrow==19.0.1
 xrspatial==0.4.0
 dask==2025.2.0
 matplotlib==3.9.2
 hvplot==0.11.1
+geoviews==1.5.0
+cartopy==0.24.0
 earthaccess==0.11.0
