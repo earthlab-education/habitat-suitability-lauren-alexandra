@@ -28,6 +28,7 @@ Run locally
 ### Install required packages
 
     $conda install pip conda-forge::dask conda-forge::xarray-spatial
+    $conda install -c conda-forge ipywidgets
     $pip install -r requirements.txt
 
 ### Set up Jupyter Notebook Kernel
