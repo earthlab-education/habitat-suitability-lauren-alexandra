@@ -54,6 +54,19 @@ def convert_longitude(longitude):
     
     return (longitude - 360) if longitude > 180 else longitude
 
+def convert_temperature(temp):
+    """
+    Convert temperature from Kelvin to Fahrenheit.
+    
+    Args:
+    temp (float): Input temperature value.
+
+    Returns:
+    float: A value in the Fahrenheit temperature scale.
+    """
+
+    return temp  * 1.8 - 459.67
+
 def export_raster(da, raster_path, data_dir):
     """
     Export raster DataArray to a raster file.
