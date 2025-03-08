@@ -85,40 +85,6 @@ def export_raster(da, raster_path, data_dir):
     output_file = os.path.join(data_dir, os.path.basename(raster_path))
     da.rio.to_raster(output_file)
 
-def harmonize_raster_layers(reference_raster, input_rasters, output_dir):
-    """
-    Harmonize raster layers to ensure consistent spatial resolution 
-    and projection.
-
-    Args:
-    reference_raster (xarray.DataArray): Input reference raster.
-    input_rasters (list): List of site rasters.
-    output_dir (str): Path of raster directory.
-
-    Returns:
-    list: A list of harmonized rasters.
-    """
-    harmonized_files = []
-
-    harmonized_files.append(reference_raster)
-    # Load the reference raster
-    ref_raster = rxr.open_rasterio(reference_raster, masked=True)
-
-    for raster_path in input_rasters:
-        # Load the input raster
-        input_raster = rxr.open_rasterio(raster_path, masked=True)
-
-        # Reproject and align the input raster to match the reference raster
-        harmonized_raster = input_raster.rio.reproject_match(ref_raster)
-
-        # Save the harmonized raster to the output directory
-        output_file = os.path.join(output_dir, os.path.basename(raster_path))
-        harmonized_raster.rio.to_raster(output_file)
-        harmonized_files.append(output_file)
-
-    print('Harmonized rasters: ', len(harmonized_files))
-    return harmonized_files
-
 def plot_site(site_da, site_gdf, plots_dir, site_fig_name, plot_title, 
               bar_label, plot_cmap, boundary_clr, tif_file=False):
     """
@@ -133,7 +99,7 @@ def plot_site(site_da, site_gdf, plots_dir, site_fig_name, plot_title,
     bar_label (str): Plot bar variable name.
     plot_cmap (str): Plot colormap name.
     boundary_clr (str): Plot site boundary color.
-    tif_file (boolean): Indicates a site file.
+    tif_file (bool): Indicates a site file.
 
     Returns:
     matplotlib.pyplot.plot: A plot of site values.
@@ -448,9 +414,9 @@ def harmonize_raster_layers(site_name, time_period, gcm, data_dir):
     reference_raster = f"{data_dir}/{site_name}_elevation.tif" 
 
     input_rasters = [
-        f"{data_dir}/{site_name}_soil_ph.tif",
+        f"{data_dir}/{site_name}_{time_period}_{gcm}_max_temp.tif",
         f"{data_dir}/{site_name}_aspect.tif",
-        f"{data_dir}/{site_name}_{time_period}_{gcm}_max_temp.tif"
+        f"{data_dir}/{site_name}_soil_ph.tif"
     ]
 
     harmonized_files = []
@@ -506,7 +472,7 @@ def calculate_suitability_score(raster, optimal_value, tolerance_range):
 def build_habitat_suitability_model(site_name, time_period, gcm,
                                     optimal_values, tolerance_ranges, 
                                     data_dir, raster_name):
-    """ 
+    """
     Build a habitat suitability model by combining fuzzy suitability scores 
     for each variable. 
 
@@ -522,9 +488,9 @@ def build_habitat_suitability_model(site_name, time_period, gcm,
     Returns:
     str: The path of the suitability raster.
     """
-    
-    harmonized_rasters = harmonize_raster_layers(
-                            site_name, time_period, gcm, data_dir)
+
+    harmonized_rasters = harmonize_raster_layers(site_name, time_period,
+                                                 gcm, data_dir)
 
     # Load and calculate suitability scores for each raster
     suitability_layers = []
