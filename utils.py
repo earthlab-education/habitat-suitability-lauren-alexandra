@@ -2,6 +2,7 @@ import os
 from glob import glob
 from math import floor, ceil
 import pandas as pd
+import numpy as np
 import rioxarray as rxr
 from rioxarray.merge import merge_arrays
 import xarray as xr
@@ -429,3 +430,121 @@ def download_climate(site_name, site_gdf, emissions_scenario,
 
         export_raster(site_clim_composite_da, 
                     f"{raster_path}_{gcm}_max_temp.tif", data_dir)
+
+def harmonize_raster_layers(site_name, time_period, gcm, data_dir):
+    """
+    Harmonize raster layers to ensure consistent spatial resolution 
+    and projection.
+
+    Args:
+    site_name (str): Name of site.
+    time_period (str): Name of time period. 
+    gcm (str): Global Climate Model.
+    data_dir (str): Path of data directory.
+
+    Returns:
+    list: A list of harmonized rasters.
+    """
+    reference_raster = f"{data_dir}/{site_name}_elevation.tif" 
+
+    input_rasters = [
+        f"{data_dir}/{site_name}_soil_ph.tif",
+        f"{data_dir}/{site_name}_aspect.tif",
+        f"{data_dir}/{site_name}_{time_period}_{gcm}_max_temp.tif"
+    ]
+
+    harmonized_files = []
+
+    harmonized_files.append(reference_raster)
+    # Load the reference raster
+    ref_raster = rxr.open_rasterio(reference_raster, masked=True)
+    # Use projection EPSG:3857 (WGS 84 with x/y coords)
+    ref_raster = ref_raster.rio.write_crs(3857)
+
+    for raster_path in input_rasters:
+        # Load the input raster
+        input_raster = rxr.open_rasterio(raster_path, masked=True)
+        input_raster = input_raster.rio.write_crs(3857)
+
+        # Reproject and align the input raster to match the reference raster
+
+        # Only 2D/3D arrays with dimensions x/y are currently supported
+        # by reproject_match()
+        harmonized_raster = input_raster.rio.reproject_match(ref_raster)
+
+        # Save the harmonized raster to the output directory
+        output_file = os.path.join(data_dir, os.path.basename(raster_path))
+        harmonized_raster.rio.to_raster(output_file)
+        harmonized_files.append(output_file)
+
+    return harmonized_files
+
+def calculate_suitability_score(raster, optimal_value, tolerance_range):
+    """ 
+    Calculate a fuzzy suitability score (0–1) for each raster cell based on 
+    proximity to the optimal value.
+
+    Args:
+    raster (xarray.DataArray): Input raster layer. 
+    optimal_value (float): Optimal value for the variable.
+    tolerance_range (float): Suitable values range. 
+
+    Returns:
+    xarray.DataArray: A raster of suitability scores (0-1).
+    """
+
+    # Calculate using a fuzzy Gaussian function to assign scores 
+    # between 0 and 1
+    suitability = np.exp(
+                    -((raster - optimal_value) ** 2) 
+                    / (2 * tolerance_range ** 2)
+                )
+
+    # Suitability scores (0–1) 
+    return suitability
+
+def build_habitat_suitability_model(site_name, time_period, gcm,
+                                    optimal_values, tolerance_ranges, 
+                                    data_dir, raster_name):
+    """ 
+    Build a habitat suitability model by combining fuzzy suitability scores 
+    for each variable. 
+
+    Args:
+    site_name (str): Name of site.
+    time_period (str): Name of time period. 
+    gcm (str): Global Climate Model.    
+    optimal_values (list): List of optimal values for variables.
+    tolerance_ranges (list): List of tolerance values for variables.
+    data_dir (str): Path of data directory.
+    raster_name (str): The name of model raster.
+
+    Returns:
+    str: The path of the suitability raster.
+    """
+    
+    harmonized_rasters = harmonize_raster_layers(
+                            site_name, time_period, gcm, data_dir)
+
+    # Load and calculate suitability scores for each raster
+    suitability_layers = []
+    suit_zip = zip(harmonized_rasters, optimal_values, tolerance_ranges)
+    for raster_path, optimal_value, tolerance_range in suit_zip:
+        raster = rxr.open_rasterio(raster_path, masked=True).squeeze()
+        suitability_layer = calculate_suitability_score(
+                                raster, optimal_value, tolerance_range
+                            )
+        suitability_layers.append(suitability_layer)
+
+    # Combine suitability scores by multiplying across all layers
+    combined_suitability = suitability_layers[0]
+    for layer in suitability_layers[1:]:
+        combined_suitability *= layer
+
+    # Save the combined suitability raster
+    output_file = os.path.join(data_dir, f"{raster_name}.tif")
+    combined_suitability.rio.to_raster(output_file)
+    print(f"Combined suitability raster saved to: {raster_name}.tif")
+
+    # Path to the final combined suitability raster
+    return output_file
