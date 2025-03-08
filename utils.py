@@ -1,8 +1,10 @@
 import os
 from glob import glob
 from math import floor, ceil
+import pandas as pd
 import rioxarray as rxr
 from rioxarray.merge import merge_arrays
+import xarray as xr
 import xrspatial
 import matplotlib.pyplot as plt
 import earthaccess
@@ -335,3 +337,95 @@ def download_topography(site_name, site_gdf, plot_path, plot_title,
 
     return elev_da
 
+def get_projected_climate(site_name, site_gdf,
+                          emissions_scenario, gcm, time_slices):
+    """
+    Create DataFrame of projected site climate for a given time period.
+    
+    Args:
+    site_name (str): Site name.
+    site_gdf (dict): Site GeoDataFrame.
+    emissions_scenario (str): Climate scenario. 
+    gcm (str): Global Climate Model. 
+    time_slices (list): List of years indicating a time slice.
+
+    Returns:
+    pandas.DataFrame: A DataFrame of projected average max temperatures.
+    """
+
+    maca_das = []
+
+    for start_year in time_slices:
+        end_year = start_year + 4
+
+        # Multivariate Adaptive Constructed Analogs (MACA)
+        MACA_URL = (
+            'http://thredds.northwestknowledge.net:8080/thredds/fileServer/' 
+            f'MACAV2/{gcm}/macav2metdata_tasmax_{gcm}_r1i1p1_'
+            f'{emissions_scenario}_{start_year}_{end_year}_CONUS_monthly.nc'
+        )
+
+        maca_da = xr.open_dataset(MACA_URL, engine='h5netcdf').squeeze()
+
+        bounds = site_gdf.to_crs(maca_da.rio.crs).total_bounds
+
+        # update coordinate range
+        maca_da = maca_da.assign_coords(
+            lon=("lon", [convert_longitude(l) for l in maca_da.lon.values])
+        )
+
+        maca_da = maca_da.rio.set_spatial_dims(x_dim='lon', y_dim='lat')
+        maca_da = maca_da.rio.clip_box(*bounds)
+
+        maca_das.append(dict(
+                            site_name=site_name,
+                            gcm=gcm,
+                            start_year=start_year,
+                            end_year=end_year,
+                            da=maca_da))
+    
+    return pd.DataFrame(maca_das)
+
+def download_climate(site_name, site_gdf, emissions_scenario, 
+                     climate_models, time_slices, raster_path, data_dir):
+    """
+    Retrieve projected site climate for a given time period, 
+    build composite DataArray, and export raster.
+    
+    Args:
+    site_name (str): Site name.
+    site_gdf (dict): Site GeoDataFrame.
+    emissions_scenario (str): Climate scenario. 
+    climate_models (list): Climate model names.
+    time_slices (list): List of years indicating a time slice.
+    raster_path (str): Path of site climate raster.
+    data_dir (str): Path of data directory.
+
+    Returns: None
+    """
+
+    for gcm in climate_models:
+        print(f'Downloading climate data for {gcm}')
+
+        # Retrieve MACA climate data
+        site_proj_temp = get_projected_climate(
+                                        site_name, site_gdf, 
+                                        emissions_scenario, gcm, 
+                                        time_slices
+                                    )
+        
+        # Convert temperature to fahrenheit 
+        projected_climates_df = site_proj_temp.assign(
+                                    fahrenheit=lambda x: x.da.map(
+                                        convert_temperature))
+
+        # Create composite site projected climate
+        site_clim_composite_ds = xr.concat(
+            projected_climates_df.fahrenheit, dim='time').mean('time')
+
+        site_clim_composite_da = site_clim_composite_ds.to_dataarray(
+                                    dim='air_temperature', 
+                                    name='air_temperature')
+
+        export_raster(site_clim_composite_da, 
+                    f"{raster_path}_{gcm}_max_temp.tif", data_dir)
