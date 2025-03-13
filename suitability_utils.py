@@ -10,6 +10,8 @@ import xrspatial
 import matplotlib.pyplot as plt
 import earthaccess
 
+### Data Wrangling ###
+
 def build_da(urls, bounds):
     """
     Build a DataArray from a list of urls.
@@ -44,6 +46,63 @@ def build_da(urls, bounds):
     merged = merge_arrays(all_das)
     return merged
 
+def export_raster(da, raster_path, data_dir):
+    """
+    Export raster DataArray to a raster file.
+    
+    Args:
+    raster (xarray.DataArray): Input raster layer.
+    raster_path (str): Output raster directory.
+    data_dir (str): Path of data directory.
+
+    Returns: None
+    """
+    
+    output_file = os.path.join(data_dir, os.path.basename(raster_path))
+    da.rio.to_raster(output_file)
+
+def harmonize_raster_layers(reference_raster, input_rasters, data_dir):
+    """
+    Harmonize raster layers to ensure consistent spatial resolution 
+    and projection.
+
+    Args:
+    reference_raster (str): Path of raster to reference.
+    input_rasters (list): List of rasters to harmonize.
+    data_dir (str): Path of data directory.
+
+    Returns:
+    list: A list of harmonized rasters.
+    """
+
+    harmonized_files = []
+
+    harmonized_files.append(reference_raster)
+    # Load the reference raster
+    ref_raster = rxr.open_rasterio(reference_raster, masked=True)
+    # Use projection EPSG:3857 (WGS 84 with x/y coords)
+    ref_raster = ref_raster.rio.write_crs(3857)
+
+    for raster_path in input_rasters:
+        # Load the input raster
+        input_raster = rxr.open_rasterio(raster_path, masked=True)
+        input_raster = input_raster.rio.write_crs(3857)
+
+        # Reproject and align the input raster to match the reference raster
+
+        # Only 2D/3D arrays with dimensions x/y are currently supported
+        # by reproject_match()
+        harmonized_raster = input_raster.rio.reproject_match(ref_raster)
+
+        # Save the harmonized raster to the output directory
+        output_file = os.path.join(data_dir, os.path.basename(raster_path))
+        harmonized_raster.rio.to_raster(output_file)
+        harmonized_files.append(output_file)
+
+    return harmonized_files
+
+### Calculations ###
+
 def convert_longitude(longitude):
     """
     Convert longitude values from a range of 0 to 360 to -180 to 180.
@@ -70,20 +129,48 @@ def convert_temperature(temp):
 
     return temp  * 1.8 - 459.67
 
-def export_raster(da, raster_path, data_dir):
+def calculate_aspect(elev_da):
     """
-    Export raster DataArray to a raster file.
+    Create aspect DataArray from site elevation.
     
     Args:
-    raster (xarray.DataArray): Input raster layer.
-    raster_path (str): Output raster directory.
-    data_dir (str): Path of data directory.
+    elev_da (xarray.DataArray): Input raster layer.
 
-    Returns: None
+    Returns:
+    xarray.DataArray: A raster of site aspect. 
     """
-    
-    output_file = os.path.join(data_dir, os.path.basename(raster_path))
-    da.rio.to_raster(output_file)
+
+    # Calculate aspect (degrees)
+    aspect_da = xrspatial.aspect(elev_da)
+    aspect_da = aspect_da.where(aspect_da >= 0)
+
+    return aspect_da
+
+def calculate_suitability_score(raster, optimal_value, tolerance_range):
+    """ 
+    Calculate a fuzzy suitability score (0–1) for each raster cell based on 
+    proximity to the optimal value.
+
+    Args:
+    raster (xarray.DataArray): Input raster layer. 
+    optimal_value (float): Optimal value for the variable.
+    tolerance_range (float): Suitable values range. 
+
+    Returns:
+    xarray.DataArray: A raster of suitability scores (0-1).
+    """
+
+    # Calculate using a fuzzy Gaussian function to assign scores 
+    # between 0 and 1
+    suitability = np.exp(
+                    -((raster - optimal_value) ** 2) 
+                    / (2 * tolerance_range ** 2)
+                )
+
+    # Suitability scores (0–1) 
+    return suitability
+
+### Visualization ###
 
 def plot_site(site_da, site_gdf, plots_dir, site_fig_name, plot_title, 
               bar_label, plot_cmap, boundary_clr, tif_file=False):
@@ -127,6 +214,8 @@ def plot_site(site_da, site_gdf, plots_dir, site_fig_name, plot_title,
     fig.savefig(f"{plots_dir}/{site_fig_name}.png") 
 
     return site_plot
+
+### Retrieve Data ###
 
 def create_polaris_urls(soil_prop, stat, soil_depth, gdf_bounds):
     """
@@ -247,23 +336,6 @@ def select_dem(bounds, site_gdf, download_dir):
     strm_da = build_da(glob(strm_pattern), tuple(site_gdf.total_bounds))
 
     return strm_da
-
-def calculate_aspect(elev_da):
-    """
-    Create aspect DataArray from site elevation.
-    
-    Args:
-    elev_da (xarray.DataArray): Input raster layer.
-
-    Returns:
-    xarray.DataArray: A raster of site aspect. 
-    """
-
-    # Calculate aspect (degrees)
-    aspect_da = xrspatial.aspect(elev_da)
-    aspect_da = aspect_da.where(aspect_da >= 0)
-
-    return aspect_da
 
 def download_topography(site_name, site_gdf, plot_path, plot_title, 
                         elevation_dir, data_dir, plots_dir):
@@ -397,77 +469,7 @@ def download_climate(site_name, site_gdf, emissions_scenario,
         export_raster(site_clim_composite_da, 
                     f"{raster_path}_{gcm}_max_temp.tif", data_dir)
 
-def harmonize_raster_layers(site_name, time_period, gcm, data_dir):
-    """
-    Harmonize raster layers to ensure consistent spatial resolution 
-    and projection.
-
-    Args:
-    site_name (str): Name of site.
-    time_period (str): Name of time period. 
-    gcm (str): Global Climate Model.
-    data_dir (str): Path of data directory.
-
-    Returns:
-    list: A list of harmonized rasters.
-    """
-    reference_raster = f"{data_dir}/{site_name}_elevation.tif" 
-
-    input_rasters = [
-        f"{data_dir}/{site_name}_{time_period}_{gcm}_max_temp.tif",
-        f"{data_dir}/{site_name}_aspect.tif",
-        f"{data_dir}/{site_name}_soil_ph.tif"
-    ]
-
-    harmonized_files = []
-
-    harmonized_files.append(reference_raster)
-    # Load the reference raster
-    ref_raster = rxr.open_rasterio(reference_raster, masked=True)
-    # Use projection EPSG:3857 (WGS 84 with x/y coords)
-    ref_raster = ref_raster.rio.write_crs(3857)
-
-    for raster_path in input_rasters:
-        # Load the input raster
-        input_raster = rxr.open_rasterio(raster_path, masked=True)
-        input_raster = input_raster.rio.write_crs(3857)
-
-        # Reproject and align the input raster to match the reference raster
-
-        # Only 2D/3D arrays with dimensions x/y are currently supported
-        # by reproject_match()
-        harmonized_raster = input_raster.rio.reproject_match(ref_raster)
-
-        # Save the harmonized raster to the output directory
-        output_file = os.path.join(data_dir, os.path.basename(raster_path))
-        harmonized_raster.rio.to_raster(output_file)
-        harmonized_files.append(output_file)
-
-    return harmonized_files
-
-def calculate_suitability_score(raster, optimal_value, tolerance_range):
-    """ 
-    Calculate a fuzzy suitability score (0–1) for each raster cell based on 
-    proximity to the optimal value.
-
-    Args:
-    raster (xarray.DataArray): Input raster layer. 
-    optimal_value (float): Optimal value for the variable.
-    tolerance_range (float): Suitable values range. 
-
-    Returns:
-    xarray.DataArray: A raster of suitability scores (0-1).
-    """
-
-    # Calculate using a fuzzy Gaussian function to assign scores 
-    # between 0 and 1
-    suitability = np.exp(
-                    -((raster - optimal_value) ** 2) 
-                    / (2 * tolerance_range ** 2)
-                )
-
-    # Suitability scores (0–1) 
-    return suitability
+### Create Suitability Model ###
 
 def build_habitat_suitability_model(site_name, time_period, gcm,
                                     optimal_values, tolerance_ranges, 
@@ -488,9 +490,16 @@ def build_habitat_suitability_model(site_name, time_period, gcm,
     Returns:
     str: The path of the suitability raster.
     """
+    reference_raster = f"{data_dir}/{site_name}_elevation.tif" 
 
-    harmonized_rasters = harmonize_raster_layers(site_name, time_period,
-                                                 gcm, data_dir)
+    input_rasters = [
+        f"{data_dir}/{site_name}_{time_period}_{gcm}_max_temp.tif",
+        f"{data_dir}/{site_name}_aspect.tif",
+        f"{data_dir}/{site_name}_soil_ph.tif"
+    ]
+
+    harmonized_rasters = harmonize_raster_layers(reference_raster, 
+                                                 input_rasters, data_dir)
 
     # Load and calculate suitability scores for each raster
     suitability_layers = []
