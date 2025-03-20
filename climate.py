@@ -581,6 +581,14 @@ plot_site(
 
 # %%
 plot_site(
+    f"{data_dir}/eld_mc_MIROC-ESM-CHEM_suitability.tif", 
+    eldorado_gdf, plots_dir,
+    'Eldorado-National-Forest-Suitability-Mid-Century-MIROC-ESM-CHEM', 
+    'Eldorado Mid Century Suitability: RCP 4.5 (MIROC-ESM-CHEM)', 
+    'Suitability', 'YlGn', 'black', tif_file=True
+)
+
+plot_site(
     f"{data_dir}/eld_lc_MIROC-ESM-CHEM_suitability.tif",
     eldorado_gdf, plots_dir,
     'Eldorado-National-Forest-Suitability-Late-Century-MIROC-ESM-CHEM', 
@@ -593,6 +601,14 @@ plot_site(
 
 # %%
 plot_site(
+    f"{data_dir}/eld_mc_CNRM-CM5_suitability.tif", 
+    eldorado_gdf, plots_dir,
+    'Eldorado-National-Forest-Suitability-Mid-Century-CNRM-CM5', 
+    'Eldorado Mid Century Suitability: RCP 4.5 (CNRM-CM5)', 
+    'Suitability', 'YlGn', 'black', tif_file=True
+)
+
+plot_site(
     f"{data_dir}/eld_lc_CNRM-CM5_suitability.tif",
     eldorado_gdf, plots_dir,
     'Eldorado-National-Forest-Suitability-Late-Century-CNRM-CM5', 
@@ -604,6 +620,14 @@ plot_site(
 # GFDL-ESM2M (Cool and dry)
 
 # %%
+plot_site(
+    f"{data_dir}/eld_mc_GFDL-ESM2M_suitability.tif", 
+    eldorado_gdf, plots_dir,
+    'Eldorado-National-Forest-Suitability-Mid-Century-GFDL-ESM2M', 
+    'Eldorado Mid Century Suitability: RCP 4.5 (GFDL-ESM2M)', 
+    'Suitability', 'YlGn', 'black', tif_file=True
+)
+
 plot_site(
     f"{data_dir}/eld_lc_GFDL-ESM2M_suitability.tif",
     eldorado_gdf, plots_dir,
@@ -681,6 +705,14 @@ plot_site(
 
 # %%
 plot_site(
+    f"{data_dir}/lp_mc_MIROC-ESM-CHEM_suitability.tif", 
+    los_padres_gdf, plots_dir,
+    'Los-Padres-National-Forest-Suitability-Mid-Century-MIROC-ESM-CHEM', 
+    'Los Padres Mid Century Suitability: RCP 4.5 (MIROC-ESM-CHEM)', 
+    'Suitability', 'YlGn', 'black', tif_file=True
+)
+
+plot_site(
     f"{data_dir}/lp_lc_MIROC-ESM-CHEM_suitability.tif", 
     los_padres_gdf, plots_dir,
     'Los-Padres-National-Forest-Suitability-Late-Century-MIROC-ESM-CHEM', 
@@ -693,6 +725,14 @@ plot_site(
 
 # %%
 plot_site(
+    f"{data_dir}/lp_mc_CNRM-CM5_suitability.tif", 
+    los_padres_gdf, plots_dir,
+    'Los-Padres-National-Forest-Suitability-Mid-Century-CNRM-CM5', 
+    'Los Padres Mid Century Suitability: RCP 4.5 (CNRM-CM5)', 
+    'Suitability', 'YlGn', 'black', tif_file=True
+)
+
+plot_site(
     f"{data_dir}/lp_lc_CNRM-CM5_suitability.tif", 
     los_padres_gdf, plots_dir,
     'Los-Padres-National-Forest-Suitability-Late-Century-CNRM-CM5', 
@@ -704,6 +744,14 @@ plot_site(
 # GFDL-ESM2M (Cool and dry)
 
 # %%
+plot_site(
+    f"{data_dir}/lp_mc_GFDL-ESM2M_suitability.tif", 
+    los_padres_gdf, plots_dir,
+    'Los-Padres-National-Forest-Suitability-Mid-Century-GFDL-ESM2M', 
+    'Los Padres Mid Century Suitability: RCP 4.5 (GFDL-ESM2M)', 
+    'Suitability', 'YlGn', 'black', tif_file=True
+)
+
 plot_site(
     f"{data_dir}/lp_lc_GFDL-ESM2M_suitability.tif", 
     los_padres_gdf, plots_dir,
